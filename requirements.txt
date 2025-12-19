@@ -1,0 +1,2 @@
+# No external dependencies required for the compatibility layer and tests.
+# All functionality uses Python standard library.
