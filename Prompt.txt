@@ -1,122 +1,170 @@
-You are an experienced backend and integration-focused professional software engineer.
+## TASK: API Migration Regression Test – Compatibility Layer Implementation
 
-ADVANCED API migration regression across three versions (v1→v2→v3):
+### Context
 
-**API Endpoints:**
-* `/api/v1/orders` - deprecated (returns 410)
-* `/api/v2/orders` - current, with `includeItems` gate
-* `/api/v3/orders` - new version with breaking changes
+You are implementing a **backward-compatibility layer** to support API evolution across **v1 → v2 → v3**.
+Legacy consumers depend on the v1 contract and **cannot be modified**.
+Newer APIs introduce **breaking structural and semantic changes**.
 
-**Key Schema Changes:**
+Your responsibility is to:
 
-| Aspect | v1 | v2 | v3 |
-|--------|----|----|-----|
-| Customer | `customerId`, `customerName` (flat) | `customer{id, name, email}` | `customer{id, name, email, address{...}, loyaltyTier}` |
-| Price | `totalPrice` (float) | `amount{value, currency}` | `pricing{subtotal, tax, discount{...}, total, currency}` |
-| Date | `createdAt` "YYYY-MM-DD" | `createdAt` ISO 8601 | `timestamps{created, updated, fulfilled}` |
-| Status | `status` (enum: PAID/CANCELLED/SHIPPED) | `state` (adds FULFILLED) | `orderStatus{current, history[]}` |
-| Items | `items[]{productName, qty}` | `lineItems[]{name, quantity, unitPrice, tax}` | `lineItems[]{id, name, quantity, pricing{...}, variant{...}, availability{...}}` |
-| Errors | `{error, message}` | `{errors: [{code, message, field}]}` | `{errors: [...], requestId, timestamp, retryable}` |
-| Pagination | None | `{data: [], total}` | `{data: [], pagination{...}, metadata{...}}` |
+* Implement transformation logic from v2/v3 → v1
+* Design and execute regression tests that prove correctness and safety
 
-**Edge Cases:**
-- v3: Multi-currency orders (need USD normalization)
-- v3: Null vs missing field semantics
-- v3: Conditional fields (shipment when SHIPPED, discount when applied)
-- Array size limits (legacy crashes with >100 items)
+---
 
-**Legacy Client Assumptions:**
-- `items` always exists and is non-empty
-- `status`, `totalPrice` are primitives (string/float)
-- `customerId`, `customerName` are flat fields
-- `createdAt` is "YYYY-MM-DD"
-- Enum values fixed, no pagination, single currency (USD)
-- Non-200 from v1 = outage
+### API Schema Evolution
 
-**Hard Constraints:**
-- CANNOT modify v2/v3 APIs or legacy clients
-- MUST use compatibility layer (gateway/adapter)
-- MUST support v2→v1 AND v3→v1 transformations
-- MUST auto-detect source version
+#### v1 (Legacy)
 
-### Mandatory Deliverables
+```json
+{
+  "orderId": "...",
+  "status": "PAID | CANCELLED | SHIPPED",
+  "totalPrice": 123.45,
+  "customerId": "...",
+  "customerName": "...",
+  "createdAt": "YYYY-MM-DD",
+  "items": []
+}
+```
 
-**1. Compatibility Mapping (with version auto-detection)**
-   - `detect_version()`: Detect v2 vs v3 from response structure
-   - `v2_to_legacy()`: Flatten customer, convert amount→totalPrice, ISO→YYYY-MM-DD, lineItems→items
-   - `v3_to_legacy()`: Unwrap pagination, extract orderStatus.current→status, pricing→totalPrice (apply discount), timestamps.created→createdAt, flatten deeply nested structures
-   - `to_legacy()`: Unified entry with auto-detection
-   - Must be idempotent and handle null/missing fields
+* Flat schema
+* USD only
+* Naive date format
 
-**2. Error Normalization**
-   - v2 `{errors: [...]}` → v1 `{error, message}`
-   - v3: Aggregate multiple errors, preserve retryable hint in message
+---
 
-**3. Three-Mode Testing (STRICT FAIL-THEN-PASS)**
-   - **RAW_V2**: Tests MUST FAIL (show v2 breaks legacy)
-   - **RAW_V3**: Tests MUST FAIL (show v3 additional breakage)
-   - **COMPAT**: Same tests MUST PASS (mapping works)
+#### v2 (Current)
 
-**4. Response Classification**
-   - DEPRECATED: v1 410 + API_VERSION_DEPRECATED
-   - TRANSIENT: v3 with retryable=true
-   - CLIENT_ERROR: 4xx
-   - OUTAGE: 5xx (non-retryable)
-   - OK: 2xx
+```json
+{
+  "orderId": "...",
+  "state": "PAID | CANCELLED | SHIPPED | FULFILLED",
+  "amount": { "value": 123.45, "currency": "USD" },
+  "customer": { "id": "...", "name": "..." },
+  "createdAt": "ISO-8601",
+  "lineItems": []
+}
+```
 
-**5. Test Runner Script**
-   - `run_tests.ps1`: Run all three modes sequentially
-   - Print pass/fail for each mode with statistics
-   - Exit non-zero if gate not satisfied
-   - Generate JSON test report
+* Nested structures
+* Multi-currency
+* Extended status enum
 
-**6. Environment Files**
-   - `requirements.txt`: Minimal pinned deps
-   - `requirements-dev.txt`: Test deps
+---
 
-**7. README**
-   - Schema evolution summary (v1→v2→v3)
-   - Breaking changes and why they break
-   - Compatibility strategy
-   - How to run tests and interpret output
+#### v3 (New)
 
-### Implementation Note
+```json
+{
+  "data": [
+    {
+      "orderId": "...",
+      "orderStatus": { "current": "...", "history": [] },
+      "pricing": { "subtotal": 0, "tax": 0, "discount": 0, "total": 0 },
+      "customer": { ... },
+      "timestamps": { "created": "...", "fulfilled": "..." }
+    }
+  ]
+}
+```
 
-Use the provided starter script as the test harness. You must implement the TODO sections:
-1. `request_json()` - HTTP client with retry logic and timeout handling
-2. `detect_version()` - Auto-detect source API version from response structure
-3. `v2_to_legacy()` - v2-specific mapping rules
-4. `v3_to_legacy()` - v3-specific mapping rules with advanced transformations
-5. `to_legacy()` - Unified entry point that auto-detects version and routes appropriately
-6. `classify_response()` - Extended monitoring semantics with severity levels
-7. `normalize_error_response()` - Handle v2/v3 error formats with aggregation
-8. `validate_idempotency()` - Ensure transformations are idempotent
-9. `benchmark_transformation()` - Measure transformation performance
+* Pagination wrapper
+* Deep nesting
+* Derived pricing fields
+* Status history
 
-You must make the COMPAT mode pass ALL checks for BOTH v2 and v3 sources.
-You must demonstrate clear failures in RAW_V2 and RAW_V3 modes.
-You must keep output technically precise and directly runnable.
-The solution must be production-ready with proper error handling and edge case coverage.
+---
 
-### Implementation Tasks
+### Functional Requirements
 
-Implement 9 TODO functions in the test harness:
-1. `request_json()`: HTTP client with retry logic (3 retries, exponential backoff)
-2. `detect_version()`: Auto-detect v2 vs v3 from response structure
-3. `v2_to_legacy()`: v2→v1 mapping
-4. `v3_to_legacy()`: v3→v1 advanced mapping
-5. `to_legacy()`: Unified entry point
-6. `classify_response()`: Extended monitoring (5 severity levels)
-7. `normalize_error_response()`: Error aggregation
-8. `validate_idempotency()`: Ensure transformations are idempotent
-9. `benchmark_transformation()`: Measure performance
+1. **Version Auto-Detection**
 
-### Quality Requirements
+   * v3 responses contain a top-level `data[]`
+   * v2 responses contain `orderId` at the root
+   * No reliance on URLs or headers
 
-- **COMPAT mode**: 100% pass rate
-- **RAW_V2/RAW_V3 modes**: Designed-to-fail tests must fail
-- **Idempotency**: Applying transformation twice = same result
-- **Performance**: <10ms per transformation (50 line items), <500ms batch (100 orders)
-- **Thread safety**: Must support concurrent transformations
-- **Code quality**: Type hints, docstrings, no TODO comments in production code
+2. **Context-Aware Status Mapping**
 
+   * `FULFILLED` + trackingNumber → `SHIPPED` (physical)
+   * `FULFILLED` without tracking → `SHIPPED` (digital)
+   * Output must conform to v1 enum set
+
+3. **Price Validation**
+
+   * Detect inconsistencies between stated totals and line item calculations
+   * Recalculate total when needed
+   * Emit non-fatal warnings
+
+4. **Currency Normalization**
+
+   * Convert all prices to USD before emitting v1 output
+
+5. **Date Normalization**
+
+   * ISO-8601 → `YYYY-MM-DD`
+   * Timezone-safe conversion
+
+6. **Audit Trail**
+
+   * Record mapping decisions and warnings
+   * Do not break legacy response schema
+
+---
+
+### Your Tasks
+
+#### 1. Test Design
+
+Create test scenarios that cover:
+
+* v2 price mismatch (amount ≠ sum of lineItems)
+* v3 context-dependent status mapping
+* Currency conversion edge cases
+* Timezone normalization
+* Error and warning handling
+* Any additional edge cases you identify
+
+#### 2. Test Data
+
+* Define test cases in a `CASES` structure **or**
+* Mock API responses inside `request_json()`
+
+#### 3. Implementation
+
+Implement the following functions:
+
+* `request_json()` – return mocked v2/v3 responses
+* `detect_version()` – determine source API version
+* `to_legacy()` – convert v2/v3 responses to v1 format
+* `run_tests()` – execute and validate all test cases
+* Additional helpers as needed
+
+---
+
+### Success Criteria
+
+* Running:
+
+```bash
+python e2e_api_regression_harness.py
+```
+
+results in:
+
+* All tests passing
+* No schema violations
+* Correct handling of edge cases
+* Clear, auditable transformation logic
+
+---
+
+### Evaluation Focus
+
+This task evaluates your ability to:
+
+* Manage breaking API evolution
+* Preserve backward compatibility
+* Design meaningful regression tests
+* Implement defensive, production-grade transformation logic
