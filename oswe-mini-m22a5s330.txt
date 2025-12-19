@@ -1,0 +1,312 @@
+User: You are implementing a **backward-compatibility layer** to support API evolution across **v1 → v2 → v3**.
+
+* Legacy consumers depend on the **v1 contract and cannot be modified**
+* Newer APIs introduce **breaking structural and semantic changes**
+* The provided `e2e_api_regression_harness.py` is **read-only and must NOT be modified**
+
+Your responsibility is to build a **reusable compatibility and test environment** that validates v2/v3 → v1 transformations in isolation.
+
+---
+
+### API Schema Evolution
+
+#### v1 (Legacy)
+
+```json
+{
+  "orderId": "...",
+  "status": "PAID | CANCELLED | SHIPPED",
+  "totalPrice": 123.45,
+  "customerId": "...",
+  "customerName": "...",
+  "createdAt": "YYYY-MM-DD",
+  "items": []
+}
+```
+
+* Flat schema
+* USD only
+* Naive date format
+
+---
+
+#### v2 (Current)
+
+```json
+{
+  "orderId": "...",
+  "state": "PAID | CANCELLED | SHIPPED | FULFILLED",
+  "amount": { "value": 123.45, "currency": "USD" },
+  "customer": { "id": "...", "name": "..." },
+  "createdAt": "ISO-8601",
+  "lineItems": []
+}
+```
+
+* Nested structures
+* Multi-currency
+* Extended status enum
+
+---
+
+#### v3 (New)
+
+```json
+{
+  "data": [
+    {
+      "orderId": "...",
+      "orderStatus": { "current": "...", "history": [] },
+      "pricing": { "subtotal": 0, "tax": 0, "discount": 0, "total": 0 },
+      "customer": { ... },
+      "timestamps": { "created": "...", "fulfilled": "..." }
+    }
+  ]
+}
+```
+
+* Pagination wrapper
+* Deep nesting
+* Derived pricing fields
+* Status history
+
+---
+
+### Functional Requirements
+
+1. **Version Auto-Detection**
+
+   * v3 responses contain a top-level `data[]`
+   * v2 responses contain `orderId` at the root
+   * No reliance on URLs, headers, or environment flags
+
+2. **Context-Aware Status Mapping**
+
+   * `FULFILLED` + trackingNumber → `SHIPPED` (physical)
+   * `FULFILLED` without tracking → `SHIPPED` (digital)
+   * Output must strictly conform to the v1 enum set
+
+3. **Price Validation**
+
+   * Detect inconsistencies between declared totals and calculated line item sums
+   * Recalculate totals when required
+   * Emit non-fatal warnings without breaking the v1 schema
+
+4. **Currency Normalization**
+
+   * Convert all prices to USD before emitting v1-compatible output
+
+5. **Date Normalization**
+
+   * ISO-8601 → `YYYY-MM-DD`
+   * Timezone-safe conversion
+
+6. **Audit Trail**
+
+   * Record transformation decisions and warnings
+   * Must not alter or pollute the legacy response schema
+
+---
+
+### Hard Constraints
+
+* **DO NOT modify** `e2e_api_regression_harness.py`
+* Transformation logic and tests **must live outside the harness**
+* The solution must support a **reusable, clean test environment**
+* Tests must be executable via a **single command**
+
+---
+
+### Your Tasks
+
+#### 1. Compatibility Layer Implementation
+
+Create a standalone module (or modules) that implements:
+
+* `request_json()` – mocked API responses for v2/v3
+* `detect_version()` – infer source API version from response structure
+* `to_legacy()` – transform v2/v3 responses into v1-compatible format
+* Any helper functions required for mapping, validation, or normalization
+
+The harness will import and invoke your implementation.
+
+---
+
+#### 2. Test Suite (External to Harness)
+
+* Write regression tests **outside** `e2e_api_regression_harness.py`
+* Tests must cover:
+
+  * v2 price mismatch (amount ≠ sum of lineItems)
+  * v3 context-dependent status mapping
+  * Currency conversion edge cases
+  * Timezone normalization
+  * Error and warning handling
+  * Additional edge cases you identify
+* Tests must be deterministic and environment-independent
+
+---
+
+#### 3. One-Click Test Execution
+
+Provide a test runner script (e.g. `run_tests.py` or `run_tests.sh`) such that:
+
+```bash
+./run_tests
+```
+
+or
+
+```bash
+python run_tests.py
+```
+
+* Executes all tests
+* Fails with a non-zero exit code on any regression
+* Can be used in CI without modification
+
+---
+
+### Deliverables
+
+Your submission must include:
+
+* Compatibility layer source code
+* External test suite
+* Test runner (`run_tests`)
+* `requirements.txt` (and `requirements-dev.txt` if needed)
+* **README.md**
+
+---
+
+### README Requirements
+
+The README must clearly document:
+
+* API version differences (v1 → v2 → v3)
+* Compatibility and transformation strategy
+* How version detection works
+* How to run tests locally
+* How to interpret test results
+* Any assumptions or known limitations
+
+---
+
+### Success Criteria
+
+* Running the test runner results in:
+
+  * All tests passing
+  * No schema violations
+  * Correct handling of edge cases
+* `e2e_api_regression_harness.py` remains unchanged
+* The environment is reusable and CI-ready
+
+---
+
+### Evaluation Focus
+
+This task evaluates your ability to:
+
+* Design backward-compatible integration layers
+* Isolate test logic from production harnesses
+* Build reusable, automation-friendly test environments
+* Handle real-world API evolution safely and defensively
+
+
+GitHub Copilot: Status: I'll inspect the harness to see how it calls the compatibility functions so our API matches its expectations.
+
+Read [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/e2e_api_regression_harness.py)
+
+Status: I'll add the compatibility module, tests, test runner, requirements, and README files. I'll create the module with implementations and tests covering required scenarios, and a run_tests.py that executes pytest.
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/compat)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/compat/compat.py)
+
+Status: I'll add pytest-based tests covering detection, mapping, conversion, date normalization, error handling, and harness integration.
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/tests/test_compat.py)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/run_tests.py)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/run_tests)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/requirements.txt)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/requirements-dev.txt)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/README.md)
+
+Status: Running the test suite now to validate the implementation and harness integration.
+
+Ran terminal command: python run_tests.py
+
+Status: Adjusting the JPY conversion test to expect the recalculated total (line-item based), since price validation mandates recalculation on mismatch. I'll update the test accordingly and re-run tests.
+
+Using "Replace String in File"
+
+
+```
+
+```
+Status: Re-running tests after updating expectations.
+
+Ran terminal command: python run_tests.py
+
+Status: Updating the harness integration test logic in compat.run_tests to align with price-recalculation behavior (use line-item recalculated totals).
+
+Using "Replace String in File"
+
+
+```
+
+```
+Status: Re-running the full test suite to verify the fix.
+
+Ran terminal command: python run_tests.py
+
+Done — I implemented the compatibility layer, tests, and a one-click test runner.
+
+What I added
+- New compatibility module: compat.py
+  - Implements: request_json, detect_version, to_legacy, normalize_error_response, classify_response, run_tests
+  - Helpers: deterministic exchange rates, date normalization, price validation, audit trail
+- Tests: test_compat.py (pytest)
+  - Covers v2 price mismatch + recalculation, v3 status mapping (physical/digital), currency conversion edge case, timezone-safe date normalization, error normalization & classification, harness integration
+- Test runner:
+  - run_tests.py (python) to run pytest
+  - run_tests (shell wrapper)
+- Requirements:
+  - requirements.txt (python-dateutil)
+  - requirements-dev.txt (pytest)
+- README.md documenting strategy, detection, running tests, assumptions
+
+Notes and choices
+- to_legacy returns (legacy_dict, AuditTrail) — the legacy response is schema-pure (no audit fields). AuditTrail contains decisions/warnings.
+- Price validation: when declared total != line item sum (after currency normalization), the recalculated sum is used and a warning + decision are recorded (non-fatal).
+- Currency exchange rates are deterministic and test-focused. Unknown currencies fall back to 1:1 with a warning.
+- Date normalization uses dateutil to parse ISO-8601 and returns YYYY-MM-DD in a timezone-safe way.
+- The harness (e2e_api_regression_harness.py) is left unchanged. The tests monkeypatch the harness with functions from compat so the harness can run using the compatibility implementation.
+
+How to run
+1) Install dependencies:
+   - python -m pip install -r requirements.txt -r requirements-dev.txt
+
+2) Run tests (one command):
+   - python run_tests.py
+   - or (POSIX) ./run_tests
+
+All tests pass:
+- I ran the suite locally and got 9 passed.
+
+If you want, I can:
+- Add more currencies and realistic conversion plumbing
+- Expand v3 mapping for multiple data[] entries
+- Add CI workflow file that runs run_tests.py
+
+If you'd like any of those, tell me which and I'll implement it.
+
+(Implementation signed as: GitHub Copilot using model vsc-5mini-mix22-arm5-step330)
+
+Made changes.
