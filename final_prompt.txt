@@ -168,3 +168,47 @@ python run_tests.py
 ---
 
 ### Deliverables
+
+Your submission must include:
+
+* Compatibility layer source code
+* External test suite
+* Test runner (`run_tests`)
+* `requirements.txt` (and `requirements-dev.txt` if needed)
+* **README.md**
+
+---
+
+### README Requirements
+
+The README must clearly document:
+
+* API version differences (v1 → v2 → v3)
+* Compatibility and transformation strategy
+* How version detection works
+* How to run tests locally
+* How to interpret test results
+* Any assumptions or known limitations
+
+---
+
+### Success Criteria
+
+* Running the test runner results in:
+
+  * All tests passing
+  * No schema violations
+  * Correct handling of edge cases
+* `e2e_api_regression_harness.py` remains unchanged
+* The environment is reusable and CI-ready
+
+---
+
+### Evaluation Focus
+
+This task evaluates your ability to:
+
+* Design backward-compatible integration layers
+* Isolate test logic from production harnesses
+* Build reusable, automation-friendly test environments
+* Handle real-world API evolution safely and defensively
