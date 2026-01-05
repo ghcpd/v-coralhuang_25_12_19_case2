@@ -1,0 +1,2 @@
+# No external runtime dependencies required for the test suite.
+# (Everything uses Python stdlib.)
