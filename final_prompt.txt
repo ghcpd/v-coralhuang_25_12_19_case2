@@ -1,0 +1,214 @@
+You are implementing a **backward-compatibility layer** to support API evolution across **v1 → v2 → v3**.
+
+* Legacy consumers depend on the **v1 contract and cannot be modified**
+* Newer APIs introduce **breaking structural and semantic changes**
+* The provided `e2e_api_regression_harness.py` is **read-only and must NOT be modified**
+
+Your responsibility is to build a **reusable compatibility and test environment** that validates v2/v3 → v1 transformations in isolation.
+
+---
+
+### API Schema Evolution
+
+#### v1 (Legacy)
+
+```json
+{
+  "orderId": "...",
+  "status": "PAID | CANCELLED | SHIPPED",
+  "totalPrice": 123.45,
+  "customerId": "...",
+  "customerName": "...",
+  "createdAt": "YYYY-MM-DD",
+  "items": []
+}
+```
+
+* Flat schema
+* USD only
+* Naive date format
+
+---
+
+#### v2 (Current)
+
+```json
+{
+  "orderId": "...",
+  "state": "PAID | CANCELLED | SHIPPED | FULFILLED",
+  "amount": { "value": 123.45, "currency": "USD" },
+  "customer": { "id": "...", "name": "..." },
+  "createdAt": "ISO-8601",
+  "lineItems": []
+}
+```
+
+* Nested structures
+* Multi-currency
+* Extended status enum
+
+---
+
+#### v3 (New)
+
+```json
+{
+  "data": [
+    {
+      "orderId": "...",
+      "orderStatus": { "current": "...", "history": [] },
+      "pricing": { "subtotal": 0, "tax": 0, "discount": 0, "total": 0 },
+      "customer": { ... },
+      "timestamps": { "created": "...", "fulfilled": "..." }
+    }
+  ]
+}
+```
+
+* Pagination wrapper
+* Deep nesting
+* Derived pricing fields
+* Status history
+
+---
+
+### Functional Requirements
+
+1. **Version Auto-Detection**
+
+   * v3 responses contain a top-level `data[]`
+   * v2 responses contain `orderId` at the root
+   * No reliance on URLs, headers, or environment flags
+
+2. **Context-Aware Status Mapping**
+
+   * `FULFILLED` + trackingNumber → `SHIPPED` (physical)
+   * `FULFILLED` without tracking → `SHIPPED` (digital)
+   * Output must strictly conform to the v1 enum set
+
+3. **Price Validation**
+
+   * Detect inconsistencies between declared totals and calculated line item sums
+   * Recalculate totals when required
+   * Emit non-fatal warnings without breaking the v1 schema
+
+4. **Currency Normalization**
+
+   * Convert all prices to USD before emitting v1-compatible output
+
+5. **Date Normalization**
+
+   * ISO-8601 → `YYYY-MM-DD`
+   * Timezone-safe conversion
+
+6. **Audit Trail**
+
+   * Record transformation decisions and warnings
+   * Must not alter or pollute the legacy response schema
+
+---
+
+### Hard Constraints
+
+* **DO NOT modify** `e2e_api_regression_harness.py`
+* Transformation logic and tests **must live outside the harness**
+* The solution must support a **reusable, clean test environment**
+* Tests must be executable via a **single command**
+
+---
+
+### Your Tasks
+
+#### 1. Compatibility Layer Implementation
+
+Create a standalone module (or modules) that implements:
+
+* `request_json()` – mocked API responses for v2/v3
+* `detect_version()` – infer source API version from response structure
+* `to_legacy()` – transform v2/v3 responses into v1-compatible format
+* Any helper functions required for mapping, validation, or normalization
+
+The harness will import and invoke your implementation.
+
+---
+
+#### 2. Test Suite (External to Harness)
+
+* Write regression tests **outside** `e2e_api_regression_harness.py`
+* Tests must cover:
+
+  * v2 price mismatch (amount ≠ sum of lineItems)
+  * v3 context-dependent status mapping
+  * Currency conversion edge cases
+  * Timezone normalization
+  * Error and warning handling
+  * Additional edge cases you identify
+* Tests must be deterministic and environment-independent
+
+---
+
+#### 3. One-Click Test Execution
+
+Provide a test runner script (e.g. `run_tests.py` or `run_tests.sh`) such that:
+
+```bash
+./run_tests
+```
+
+or
+
+```bash
+python run_tests.py
+```
+
+* Executes all tests
+* Fails with a non-zero exit code on any regression
+* Can be used in CI without modification
+
+---
+
+### Deliverables
+
+Your submission must include:
+
+* Compatibility layer source code
+* External test suite
+* Test runner (`run_tests`)
+* `requirements.txt` (and `requirements-dev.txt` if needed)
+* **README.md**
+
+---
+
+### README Requirements
+
+The README must clearly document:
+
+* API version differences (v1 → v2 → v3)
+* Compatibility and transformation strategy
+* How version detection works
+* How to run tests locally
+* How to interpret test results
+* Any assumptions or known limitations
+
+---
+
+### Success Criteria
+
+* Running the test runner results in:
+
+  * All tests passing
+  * No schema violations
+  * Correct handling of edge cases
+* `e2e_api_regression_harness.py` remains unchanged
+* The environment is reusable and CI-ready
+
+---
+
+### Evaluation Focus
+
+This task evaluates your ability to:
+
+* Design backward-compatible integration layers
+* Isolate test logic from production harnesses
+* Build reusable, automation-friendly test environments
+* Handle real-world API evolution safely and defensively

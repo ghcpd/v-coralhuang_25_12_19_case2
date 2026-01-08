@@ -1,0 +1,359 @@
+User: You are implementing a **backward-compatibility layer** to support API evolution across **v1 → v2 → v3**.
+
+* Legacy consumers depend on the **v1 contract and cannot be modified**
+* Newer APIs introduce **breaking structural and semantic changes**
+* The provided `e2e_api_regression_harness.py` is **read-only and must NOT be modified**
+
+Your responsibility is to build a **reusable compatibility and test environment** that validates v2/v3 → v1 transformations in isolation.
+
+---
+
+### API Schema Evolution
+
+#### v1 (Legacy)
+
+```json
+{
+  "orderId": "...",
+  "status": "PAID | CANCELLED | SHIPPED",
+  "totalPrice": 123.45,
+  "customerId": "...",
+  "customerName": "...",
+  "createdAt": "YYYY-MM-DD",
+  "items": []
+}
+```
+
+* Flat schema
+* USD only
+* Naive date format
+
+---
+
+#### v2 (Current)
+
+```json
+{
+  "orderId": "...",
+  "state": "PAID | CANCELLED | SHIPPED | FULFILLED",
+  "amount": { "value": 123.45, "currency": "USD" },
+  "customer": { "id": "...", "name": "..." },
+  "createdAt": "ISO-8601",
+  "lineItems": []
+}
+```
+
+* Nested structures
+* Multi-currency
+* Extended status enum
+
+---
+
+#### v3 (New)
+
+```json
+{
+  "data": [
+    {
+      "orderId": "...",
+      "orderStatus": { "current": "...", "history": [] },
+      "pricing": { "subtotal": 0, "tax": 0, "discount": 0, "total": 0 },
+      "customer": { ... },
+      "timestamps": { "created": "...", "fulfilled": "..." }
+    }
+  ]
+}
+```
+
+* Pagination wrapper
+* Deep nesting
+* Derived pricing fields
+* Status history
+
+---
+
+### Functional Requirements
+
+1. **Version Auto-Detection**
+
+   * v3 responses contain a top-level `data[]`
+   * v2 responses contain `orderId` at the root
+   * No reliance on URLs, headers, or environment flags
+
+2. **Context-Aware Status Mapping**
+
+   * `FULFILLED` + trackingNumber → `SHIPPED` (physical)
+   * `FULFILLED` without tracking → `SHIPPED` (digital)
+   * Output must strictly conform to the v1 enum set
+
+3. **Price Validation**
+
+   * Detect inconsistencies between declared totals and calculated line item sums
+   * Recalculate totals when required
+   * Emit non-fatal warnings without breaking the v1 schema
+
+4. **Currency Normalization**
+
+   * Convert all prices to USD before emitting v1-compatible output
+
+5. **Date Normalization**
+
+   * ISO-8601 → `YYYY-MM-DD`
+   * Timezone-safe conversion
+
+6. **Audit Trail**
+
+   * Record transformation decisions and warnings
+   * Must not alter or pollute the legacy response schema
+
+---
+
+### Hard Constraints
+
+* **DO NOT modify** `e2e_api_regression_harness.py`
+* Transformation logic and tests **must live outside the harness**
+* The solution must support a **reusable, clean test environment**
+* Tests must be executable via a **single command**
+
+---
+
+### Your Tasks
+
+#### 1. Compatibility Layer Implementation
+
+Create a standalone module (or modules) that implements:
+
+* `request_json()` – mocked API responses for v2/v3
+* `detect_version()` – infer source API version from response structure
+* `to_legacy()` – transform v2/v3 responses into v1-compatible format
+* Any helper functions required for mapping, validation, or normalization
+
+The harness will import and invoke your implementation.
+
+---
+
+#### 2. Test Suite (External to Harness)
+
+* Write regression tests **outside** `e2e_api_regression_harness.py`
+* Tests must cover:
+
+  * v2 price mismatch (amount ≠ sum of lineItems)
+  * v3 context-dependent status mapping
+  * Currency conversion edge cases
+  * Timezone normalization
+  * Error and warning handling
+  * Additional edge cases you identify
+* Tests must be deterministic and environment-independent
+
+---
+
+#### 3. One-Click Test Execution
+
+Provide a test runner script (e.g. `run_tests.py` or `run_tests.sh`) such that:
+
+```bash
+./run_tests
+```
+
+or
+
+```bash
+python run_tests.py
+```
+
+* Executes all tests
+* Fails with a non-zero exit code on any regression
+* Can be used in CI without modification
+
+---
+
+### Deliverables
+
+Your submission must include:
+
+* Compatibility layer source code
+* External test suite
+* Test runner (`run_tests`)
+* `requirements.txt` (and `requirements-dev.txt` if needed)
+* **README.md**
+
+---
+
+### README Requirements
+
+The README must clearly document:
+
+* API version differences (v1 → v2 → v3)
+* Compatibility and transformation strategy
+* How version detection works
+* How to run tests locally
+* How to interpret test results
+* Any assumptions or known limitations
+
+---
+
+### Success Criteria
+
+* Running the test runner results in:
+
+  * All tests passing
+  * No schema violations
+  * Correct handling of edge cases
+* `e2e_api_regression_harness.py` remains unchanged
+* The environment is reusable and CI-ready
+
+---
+
+### Evaluation Focus
+
+This task evaluates your ability to:
+
+* Design backward-compatible integration layers
+* Isolate test logic from production harnesses
+* Build reusable, automation-friendly test environments
+* Handle real-world API evolution safely and defensively
+
+
+GitHub Copilot: Optimizing tool selection...Proceeding to scan the workspace to find existing files and identify where to add the compatibility layer and tests.
+
+Searched for files matching `**/*`, 2 matches
+
+Read [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/e2e_api_regression_harness.py)
+
+Perfect — I'll add the compatibility layer module, tests, runner, and docs next.
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/compat_layer/__init__.py)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/tests/test_compat.py)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/run_tests.py)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/run_tests)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/requirements.txt)
+
+Created [](file:///c%3A/Bug_Bash/25_12_19/v-coralhuang_25_12_19_case2/README.md)
+
+Proceeding to install test dependencies and run the test suite to verify behavior. I'll run pip install and then execute the runner.
+
+Ran terminal command: pip install -r requirements.txt
+
+Configuring a Python Environment
+Completed with input: {
+  "resourcePath": "c:\\Bug_Bash\\25_12_19\\v-coralhuang_25_12_19_case2"
+}
+
+Creating a Virtual Environment
+Completed with input: {
+  "resourcePath": "c:\\Bug_Bash\\25_12_19\\v-coralhuang_25_12_19_case2"
+}
+
+Installing packages pytest==7.4.0, python-dateutil==2.8.2 in .venv (3.14.0)
+Completed with input: {
+  "packageList": [
+    "python-dateutil==2.8.2",
+    "pytest==7.4.0"
+  ],
+  "resourcePath": "c:\\Bug_Bash\\25_12_19\\v-coralhuang_25_12_19_case2"
+}
+
+Ran terminal command: python run_tests.py
+
+Perfect! All tests ran and passed locally (7/7). My next step is to summarize what I added and how to run the tests.## ✅ Summary & Deliverables
+
+**What I implemented**
+- A reusable compatibility layer that transforms v2/v3 → v1 without modifying the provided harness.
+- A deterministic, testable mock provider (`request_json`) for test scenarios.
+- Full transformation logic:
+  - `detect_version()` — auto-detects v2 vs v3 vs v1.
+  - `to_legacy()` — performs status mapping, currency normalization, price validation/recalculation, ISO→YYYY-MM-DD timezone-safe normalization, and returns an `AuditTrail`.
+  - `normalize_error_response()` and `classify_response()` — standardize errors and classify responses.
+- A pytest-based test suite covering required scenarios and edge cases.
+- A one-command test runner (run_tests.py, plus run_tests wrapper).
+- Documentation and deterministic dependencies.
+
+Files added
+- __init__.py 🔧 — Compatibility logic & `request_json` test data
+- test_compat.py ✅ — Regression tests
+- run_tests.py and run_tests (shell wrapper) ▶️ — Single-command test runner
+- requirements.txt 📦 — pinned deps (python-dateutil, pytest)
+- README.md 📘 — usage, strategy, assumptions
+
+---
+
+## 🔧 How to run locally
+
+1. Create and activate a venv and install deps:
+   - Windows PowerShell:
+     ```
+     python -m venv .venv
+     Activate.ps1
+     pip install -r requirements.txt
+     ```
+2. Run tests:
+   - Python: `python run_tests.py`
+   - Or: `./run_tests`
+
+- The runner exits with a non-zero code on test failures (CI-friendly). ✅
+
+---
+
+## 🎯 What the tests cover
+
+- v2 price mismatch -> recalculation + non-fatal warning
+- v3 context-dependent status mapping (physical vs digital) and mapping to v1 enum
+- Currency conversion edge cases (EUR, JPY, GBP, fallback behavior)
+- ISO-8601 timezone normalization to `YYYY-MM-DD` (UTC-safe)
+- Error normalization and response classification
+- Schema preservation: audit/logs kept separate from the legacy payload
+
+---
+
+## 💡 Notes, assumptions & limitations
+
+- Currency rates are hard-coded in `compat_layer` for deterministic tests — swap for a rates service for real-world use.
+- `request_json` provides deterministic mock payloads used by the tests; production integration would replace this with real API calls.
+- v3 transformation assumes single-order per `data[]` for the legacy transform (pagination is out-of-scope here).
+
+---
+
+If you'd like, I can:
+1. Add more test cases (e.g., unknown currencies, malformed dates).
+2. Wire the harness to import this module (if you want the harness to use it directly).
+3. Prepare a small PR or packaging to make this ready for CI.
+
+Would you like me to add extra tests or prepare a PR?2. Run tests:
+   - Python: `python run_tests.py`
+   - Or: `./run_tests`
+
+- The runner exits with a non-zero code on test failures (CI-friendly). ✅
+
+---
+
+## 🎯 What the tests cover
+
+- v2 price mismatch -> recalculation + non-fatal warning
+- v3 context-dependent status mapping (physical vs digital) and mapping to v1 enum
+- Currency conversion edge cases (EUR, JPY, GBP, fallback behavior)
+- ISO-8601 timezone normalization to `YYYY-MM-DD` (UTC-safe)
+- Error normalization and response classification
+- Schema preservation: audit/logs kept separate from the legacy payload
+
+---
+
+## 💡 Notes, assumptions & limitations
+
+- Currency rates are hard-coded in `compat_layer` for deterministic tests — swap for a rates service for real-world use.
+- `request_json` provides deterministic mock payloads used by the tests; production integration would replace this with real API calls.
+- v3 transformation assumes single-order per `data[]` for the legacy transform (pagination is out-of-scope here).
+
+---
+
+If you'd like, I can:
+1. Add more test cases (e.g., unknown currencies, malformed dates).
+2. Wire the harness to import this module (if you want the harness to use it directly).
+3. Prepare a small PR or packaging to make this ready for CI.
+
+Would you like me to add extra tests or prepare a PR?
+
+Made changes.
